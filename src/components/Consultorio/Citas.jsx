@@ -28,6 +28,7 @@ export default function Citas() {
   const [filtro, setFiltro] = useState('todas')
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [form, setForm] = useState({ paciente_id: '', tratamiento_id: '', fecha: '', duracion_min: 30, notas: '' })
+  const [saving, setSaving] = useState(false)
 
   const load = async () => {
     const [c, p, t, cl] = await Promise.all([
@@ -41,11 +42,46 @@ export default function Citas() {
   }
   useEffect(() => { load() }, [])
 
+  // Conversor infalible de fecha HTML5 Local a ISO con Zona Horaria Local (Evita desfase)
+  const parseLocalHTML5DateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return null
+    const [datePart, timePart] = dateTimeStr.split('T')
+    const [year, month, day] = datePart.split('-').map(Number)
+    const [hours, minutes] = timePart.split(':').map(Number)
+    return new Date(year, month - 1, day, hours, minutes)
+  }
+
   const save = async e => {
     e.preventDefault()
-    const t = trats.find(x => x.id === form.tratamiento_id)
-    await supabase.from('citas').insert([{ ...form, tratamiento_id: form.tratamiento_id || null, duracion_min: t?.duracion_min || form.duracion_min }])
-    toast.success('Cita agendada'); setShowForm(false); load()
+    if (saving) return
+    setSaving(true)
+
+    try {
+      const localDate = parseLocalHTML5DateTime(form.fecha)
+      if (!localDate || isNaN(localDate.getTime())) {
+        throw new Error('Fecha u hora inválida')
+      }
+
+      const t = trats.find(x => x.id === form.tratamiento_id)
+      
+      const payload = {
+        ...form,
+        fecha: localDate.toISOString(), // Convierte con desfase correcto a UTC
+        tratamiento_id: form.tratamiento_id || null,
+        duracion_min: t?.duracion_min || form.duracion_min
+      }
+
+      const { error } = await supabase.from('citas').insert([payload])
+      if (error) throw error
+
+      toast.success('Cita agendada con éxito')
+      setShowForm(false)
+      load()
+    } catch (err) {
+      toast.error(err.message || 'Error al agendar cita')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const setStatus = async (id, est) => {
@@ -82,7 +118,7 @@ export default function Citas() {
               <List className="w-3.5 h-3.5" /> Lista
             </button>
           </div>
-          <button onClick={() => { setShowForm(!showForm); setForm({ paciente_id: '', tratamiento_id: '', fecha: `${fecha}T09:00`, duracion_min: 30, notas: '' }) }} className={showForm ? 'btn-secondary' : 'btn-primary'}>
+          <button onClick={() => { setShowForm(!showForm); setForm({ paciente_id: '', tratamiento_id: '', fecha: `${fecha}T09:00`, duracion_min: 30, notes: '' }) }} className={showForm ? 'btn-secondary' : 'btn-primary'}>
             {showForm ? <><X className="w-4 h-4" /> Cerrar</> : <><Plus className="w-4 h-4" /> Agendar Cita</>}
           </button>
         </div>
@@ -112,7 +148,9 @@ export default function Citas() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="btn-primary"><Save className="w-4 h-4" /> Confirmar Cita</button>
+            <button type="submit" disabled={saving} className="btn-primary">
+              {saving ? 'Agendando...' : <><Save className="w-4 h-4" /> Confirmar Cita</>}
+            </button>
             <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Cancelar</button>
           </div>
         </form>
@@ -127,7 +165,7 @@ export default function Citas() {
         <button onClick={() => setFecha(hoy)} className="btn-secondary text-xs py-1">Ir a Hoy</button>
       </div>
 
-      {/* Vista de Horarios con botón WhatsApp */}
+      {/* Vista de Horarios */}
       {vista === 'horas' && (
         <div className="card-box p-4 space-y-2">
           <div className="divide-y divide-slate-100">
@@ -188,7 +226,7 @@ export default function Citas() {
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <h3 className="font-bold text-sm text-slate-800">{c.pacientes?.nombres} {c.pacientes?.apellidos}</h3>
-                  <p className="text-xs text-teal-700">{c.tratamientos?.nombre || 'Consulta General'} • {new Date(c.fecha).toLocaleTimeString('es-VE')}</p>
+                  <p className="text-xs text-teal-700">{c.tratamientos?.nombre || 'Consulta General'} • {new Date(c.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => sendWhatsAppReminder(c)} className="btn-secondary text-xs py-1 px-2.5 text-emerald-700 bg-emerald-50">
