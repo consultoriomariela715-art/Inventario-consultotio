@@ -85,7 +85,12 @@ export default function Tratamientos() {
     setEditId(t.id); setShowForm(true); setExpanded(null)
   }
 
-  const del = async id => { if (!confirm('¿Desactivar?')) return; await supabase.from('tratamientos').update({ activo: false }).eq('id', id); toast.success('Desactivado'); load() }
+  const del = async id => { 
+    if (!confirm('¿Desactivar este tratamiento del catálogo?')) return; 
+    await supabase.from('tratamientos').update({ activo: false }).eq('id', id); 
+    toast.success('Tratamiento desactivado'); 
+    load() 
+  }
 
   const grouped = {}
   list.forEach(t => { const c = t.categoria || 'General'; if (!grouped[c]) grouped[c] = []; grouped[c].push(t) })
@@ -174,7 +179,7 @@ export default function Tratamientos() {
 
             return (
               <div key={t.id} className="card-box p-0 overflow-hidden">
-                <button onClick={() => setExpanded(isExp ? null : t.id)} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 text-left">
+                <div className="w-full flex items-center justify-between p-4 hover:bg-slate-50 text-left">
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{catIcons[t.categoria] || '🦷'}</span>
                     <div>
@@ -182,33 +187,31 @@ export default function Tratamientos() {
                       {t.descripcion && <p className="text-[11px] text-slate-400">{t.descripcion}</p>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3" /> {t.duracion_min}m</span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs text-slate-400 flex items-center gap-1 hidden sm:flex"><Clock className="w-3 h-3" /> {t.duracion_min}m</span>
                     <PriceBox usd={t.precio} />
-                    {insT.length > 0 && <span className="badge bg-teal-50 text-teal-700 font-bold"><Package className="w-3 h-3" /> {insT.length} insumos</span>}
-                    {isExp ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                    {insT.length > 0 && <span className="badge bg-teal-50 text-teal-700 font-bold hidden md:inline-flex"><Package className="w-3 h-3" /> {insT.length} insumos</span>}
+                    
+                    {/* Botones de acción directa sin expandir */}
+                    <button onClick={() => startEdit(t)} className="p-1 hover:bg-yellow-50 text-yellow-600 rounded" title="Editar"><Edit3 className="w-4 h-4" /></button>
+                    <button onClick={() => del(t.id)} className="p-1 hover:bg-red-50 text-red-600 rounded" title="Desactivar"><Trash2 className="w-4 h-4" /></button>
+                    
+                    <button onClick={() => setExpanded(isExp ? null : t.id)} className="p-1 hover:bg-slate-200 rounded text-slate-400">
+                      {isExp ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
                   </div>
-                </button>
+                </div>
 
-                {isExp && (
+                {isExp && insT.length > 0 && (
                   <div className="border-t bg-slate-50 p-4 space-y-3">
-                    <div className="text-xs"><PriceBox usd={t.precio} showAll /></div>
-
-                    {insT.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[11px] font-bold text-slate-500 uppercase">Insumos vinculados para este procedimiento:</p>
-                        {insT.map(i => (
-                          <div key={i.id} className="flex justify-between text-xs bg-white p-2 rounded-lg border">
-                            <span className="flex items-center gap-1.5"><Package className="w-3 h-3 text-teal-600" /> {i.productos?.nombre}</span>
-                            <span className="font-bold">{i.cantidad} x ${i.productos?.precio_venta}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 pt-1">
-                      <button onClick={() => startEdit(t)} className="btn-secondary text-xs"><Edit3 className="w-3.5 h-3.5" /> Editar</button>
-                      <button onClick={() => del(t.id)} className="btn-danger text-xs"><Trash2 className="w-3.5 h-3.5" /> Desactivar</button>
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-bold text-slate-500 uppercase">Insumos vinculados para este procedimiento:</p>
+                      {insT.map(i => (
+                        <div key={i.id} className="flex justify-between text-xs bg-white p-2 rounded-lg border">
+                          <span className="flex items-center gap-1.5"><Package className="w-3 h-3 text-teal-600" /> {i.productos?.nombre}</span>
+                          <span className="font-bold">{i.cantidad} x ${i.productos?.precio_venta}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

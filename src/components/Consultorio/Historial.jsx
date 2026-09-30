@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useCurrency } from '../../context/CurrencyContext'
@@ -197,7 +198,10 @@ export default function Historial() {
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-slate-500 block mb-1">Cargar Tratamiento del Catálogo</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[11px] font-semibold text-slate-500 block">Cargar Tratamiento del Catálogo</label>
+                <Link to="/tratamientos" className="text-[10px] text-teal-600 hover:underline font-bold flex items-center gap-0.5">⚙️ Editar Catálogo</Link>
+              </div>
               <select className="input-field" value={form.tratamiento_id} onChange={e => seleccionarTratamiento(e.target.value)}>
                 <option value="">Personalizado / Otro</option>
                 {trats.map(t => <option key={t.id} value={t.id}>{t.nombre} — ${t.precio}</option>)}
