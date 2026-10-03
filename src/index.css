@@ -4,48 +4,29 @@
 
 @layer base {
   body {
-    @apply bg-slate-100 text-slate-900 antialiased font-sans;
+    @apply bg-slate-100 text-slate-900 antialiased font-sans transition-colors duration-300;
   }
-  .dark body, body.dark {
-    @apply bg-slate-950 text-slate-100;
+  html.dark body, body.dark {
+    background-color: #020617 !important;
+    color: #f8fafc !important;
   }
+  .dark .bg-white { background-color: #0f172a !important; color: #f8fafc !important; }
+  .dark .bg-slate-50 { background-color: #090d1a !important; }
+  .dark .bg-slate-100 { background-color: #020617 !important; }
+  .dark .card-box { background-color: #0f172a !important; border-color: #1e293b !important; color: #f8fafc !important; }
+  .dark .text-slate-800, .dark .text-slate-900, .dark .text-slate-700 { color: #f8fafc !important; }
+  .dark .text-slate-600, .dark .text-slate-500 { color: #94a3b8 !important; }
+  .dark .border, .dark .border-b, .dark .border-t, .dark .border-slate-200, .dark .border-slate-100 { border-color: #1e293b !important; }
+  .dark .input-field { background-color: #020617 !important; border-color: #334155 !important; color: #f8fafc !important; }
+  .dark header { background-color: #0f172a !important; border-color: #1e293b !important; }
+  .dark aside { background-color: #020617 !important; border-color: #1e293b !important; }
 }
 
 @layer components {
-  .btn-primary {
-    @apply bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 
-           text-white font-bold py-2.5 px-5 rounded-xl shadow-lg shadow-teal-600/20 
-           hover:shadow-teal-600/30 hover:-translate-y-0.5 active:translate-y-0 
-           transition-all duration-200 flex items-center gap-2 cursor-pointer text-xs;
-  }
-
-  .btn-secondary {
-    @apply bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 
-           text-slate-700 dark:text-slate-200 font-bold py-2.5 px-4 rounded-xl 
-           border border-slate-200 dark:border-slate-700 shadow-sm 
-           hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 
-           flex items-center gap-2 cursor-pointer text-xs;
-  }
-
-  .btn-danger {
-    @apply bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 
-           text-white font-bold py-2.5 px-4 rounded-xl shadow-md shadow-rose-600/20 
-           hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 
-           flex items-center gap-2 cursor-pointer text-xs;
-  }
-
-  .input-field {
-    @apply w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 
-           rounded-xl text-xs outline-none transition-all duration-200 text-slate-800 dark:text-slate-100 
-           focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 shadow-inner;
-  }
-
-  .card-box {
-    @apply bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 
-           p-5 shadow-sm hover:shadow-md transition-all duration-300;
-  }
-
-  .badge {
-    @apply px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1;
-  }
+  .btn-primary { @apply bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer text-xs; }
+  .btn-secondary { @apply bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 font-bold py-2 px-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all flex items-center gap-2 cursor-pointer text-xs; }
+  .btn-danger { @apply bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer text-xs; }
+  .input-field { @apply w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none transition-all focus:border-teal-500 focus:ring-1 focus:ring-teal-500; }
+  .card-box { @apply bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm transition-all; }
+  .badge { @apply px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1 border; }
 }
