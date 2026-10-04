@@ -11,7 +11,7 @@ export default function ReciboModal({ isOpen, onClose, data, consultorio }) {
     nombre: 'CONSULTORIO ODONTOLÓGICO INTEGRAL, C.A.',
     rif_nit: 'J-12345678-0',
     telefono: '+58 412-000-00-00',
-    direccion: 'Av. Bolívar, Torre Médica Profesional, Piso 3, Of. 3-A, Caracas',
+    direccion: 'Av. Bolívar, Torre Médica Profesional, Piso 3, Caracas',
     email: 'admin@consultorio.com',
     mensaje_recibo: 'Este documento es un comprobante de pago válido según las disposiciones del SENIAT.',
     contribuyente: 'CONTRIBUYENTE FORMAL'
@@ -90,6 +90,7 @@ export default function ReciboModal({ isOpen, onClose, data, consultorio }) {
             @page { size: letter portrait; margin: 10mm 12mm; }
             body { max-width: 210mm; margin: 0 auto; padding: 0; font-size: 11px; }
             .factura-header { display: flex; justify-content: space-between; align-items: flex-start; border: 2px solid #000; padding: 12px 16px; }
+            .empresa-info { font-size: 11px; }
             .empresa-info h1 { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
             .empresa-info p { font-size: 10px; color: #333; line-height: 1.4; }
             .rif-box { border: 2px solid #000; padding: 8px 14px; text-align: center; min-width: 180px; }
@@ -256,15 +257,15 @@ export default function ReciboModal({ isOpen, onClose, data, consultorio }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 w-full max-w-3xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         
         {/* Barra superior con botón de Excel */}
-        <div className="p-4 bg-gray-50 border-b flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center bg-gray-200 p-1 rounded-xl text-xs font-semibold">
-            <button onClick={() => setFormato('factura')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${formato === 'factura' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>
+        <div className="p-4 bg-gray-50 dark:bg-slate-900 border-b dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center bg-gray-200 dark:bg-slate-700 p-1 rounded-xl text-xs font-semibold">
+            <button onClick={() => setFormato('factura')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${formato === 'factura' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>
               <FileText className="w-3.5 h-3.5" /> Factura SENIAT
             </button>
-            <button onClick={() => setFormato('ticket')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${formato === 'ticket' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>
+            <button onClick={() => setFormato('ticket')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${formato === 'ticket' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>
               <Receipt className="w-3.5 h-3.5" /> Ticket 80mm
             </button>
           </div>
@@ -288,7 +289,7 @@ export default function ReciboModal({ isOpen, onClose, data, consultorio }) {
         </div>
 
         {/* Vista previa en pantalla */}
-        <div className="p-6 max-h-[75vh] overflow-y-auto bg-gray-100">
+        <div className="p-6 max-h-[75vh] overflow-y-auto bg-gray-100 dark:bg-slate-900">
           <div className="bg-white max-w-[800px] mx-auto shadow-lg border-2 border-black p-0 text-[11px] font-sans text-black">
             <div className="flex justify-between items-start border-b-2 border-black p-4">
               <div>
