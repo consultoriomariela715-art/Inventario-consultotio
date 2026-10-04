@@ -19,6 +19,7 @@ import POS from './components/Ventas/POS'
 import HistorialVentas from './components/Ventas/HistorialVentas'
 import Inventario from './components/Inventario/Inventario'
 import TasasImpuestos from './components/Configuracion/TasasImpuestos'
+import PortalPaciente from './components/Portal/PortalPaciente'
 
 function RoutesWrapper() {
   const { auth, loading } = useAuth()
@@ -44,6 +45,7 @@ function RoutesWrapper() {
             <Route path="ventas" element={<HistorialVentas />} />
             <Route path="inventario" element={<Inventario />} />
             <Route path="config" element={<TasasImpuestos />} />
+            <Route path="portal" element={<PortalPaciente />} />
           </Route>
         </Routes>
       </BrowserRouter>

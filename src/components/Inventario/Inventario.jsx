@@ -49,12 +49,12 @@ export default function Inventario() {
     if (!form.codigo) return toast.error('Genera un código')
     const { data: np, error } = await supabase.from('productos').insert([{
       ...form, precio_compra: parseFloat(form.precio_compra) || 0, precio_venta: parseFloat(form.precio_venta) || 0,
-      stock: parseInt(form.stock) || 0, categoria_id: form.categoria_id || null,
+      stock: parseInt(form.stock_actual) || 0, categoria_id: form.categoria_id || null,
       impuesto_id: form.impuesto_id || null, fecha_vencimiento: form.fecha_vencimiento || null
     }]).select().single()
     if (error) return toast.error('Error')
-    if (form.stock > 0 && np) {
-      await supabase.from('movimientos').insert({ producto_id: np.id, tipo: 'entrada', cantidad: Number(form.stock), stock_antes: 0, stock_despues: Number(form.stock), referencia: 'Stock Inicial' })
+    if (form.stock_actual > 0 && np) {
+      await supabase.from('movimientos').insert({ producto_id: np.id, tipo: 'entrada', cantidad: Number(form.stock_actual), stock_antes: 0, stock_despues: Number(form.stock_actual), referencia: 'Stock Inicial' })
     }
     toast.success('Insumo registrado'); setShowForm(false); load()
   }
@@ -64,9 +64,9 @@ export default function Inventario() {
     const prod = list.find(p => p.id === entradaForm.producto_id)
     if (!prod) return toast.error('Selecciona un insumo')
     const cant = parseInt(entradaForm.cantidad)
-    const nuevo = prod.stock + cant
+    const nuevo = prod.stock_actual + cant
     await supabase.from('productos').update({ stock: nuevo, precio_compra: parseFloat(entradaForm.precio_compra) || prod.precio_compra }).eq('id', prod.id)
-    await supabase.from('movimientos').insert({ producto_id: prod.id, tipo: 'entrada', cantidad: cant, stock_antes: prod.stock, stock_despues: nuevo, referencia: 'Compra', notas: entradaForm.notas })
+    await supabase.from('movimientos').insert({ producto_id: prod.id, tipo: 'entrada', cantidad: cant, stock_antes: prod.stock_actual, stock_despues: nuevo, referencia: 'Compra', notas: entradaForm.notas })
     toast.success(`+${cant} unidades a ${prod.nombre}`); setEntradaForm({ producto_id: '', cantidad: 10, precio_compra: '', notas: '' }); setTab('stock'); load()
   }
 
@@ -79,7 +79,7 @@ export default function Inventario() {
     return fv <= en30
   })
 
-  const alertas = list.filter(i => i.stock <= i.stock_minimo)
+  const alertas = list.filter(i => i.stock_actual <= i.stock_minimo)
   const filtered = list.filter(i => `${i.nombre} ${i.codigo}`.toLowerCase().includes(q.toLowerCase()))
 
   return (
@@ -132,7 +132,7 @@ export default function Inventario() {
             <div><label className="text-[11px] font-semibold text-slate-500 block mb-1">Precio Venta $</label><input required type="number" step="0.01" className="input-field font-bold text-teal-700" value={form.precio_venta} onChange={e => setForm({...form, precio_venta: e.target.value})} /></div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div><label className="text-[11px] font-semibold text-slate-500 block mb-1">Stock</label><input type="number" className="input-field" value={form.stock} onChange={e => setForm({...form, stock: e.target.value})} /></div>
+            <div><label className="text-[11px] font-semibold text-slate-500 block mb-1">Stock</label><input type="number" className="input-field" value={form.stock_actual} onChange={e => setForm({...form, stock: e.target.value})} /></div>
             <div><label className="text-[11px] font-semibold text-slate-500 block mb-1">Lote</label><input className="input-field" value={form.lote} onChange={e => setForm({...form, lote: e.target.value})} placeholder="LOT-2025-001" /></div>
             <div><label className="text-[11px] font-semibold text-slate-500 block mb-1">Fecha Vencimiento</label><input type="date" className="input-field" value={form.fecha_vencimiento} onChange={e => setForm({...form, fecha_vencimiento: e.target.value})} /></div>
           </div>
@@ -151,7 +151,7 @@ export default function Inventario() {
                   <tr key={i.id} className="hover:bg-slate-50">
                     <td className="p-3 font-mono font-bold flex items-center gap-1"><QrCode className="w-3 h-3 text-teal-600" />{i.codigo}</td>
                     <td className="p-3 font-bold">{i.nombre}</td>
-                    <td className="p-3 font-bold"><span className={i.stock <= i.stock_minimo ? 'text-rose-600' : ''}>{i.stock}</span></td>
+                    <td className="p-3 font-bold"><span className={i.stock_actual <= i.stock_minimo ? 'text-rose-600' : ''}>{i.stock_actual}</span></td>
                     <td className="p-3">{i.fecha_vencimiento ? <span className={new Date(i.fecha_vencimiento) <= en30 ? 'text-amber-600 font-bold' : 'text-slate-400'}>{new Date(i.fecha_vencimiento).toLocaleDateString('es-VE')}</span> : '—'}</td>
                     <td className="p-3"><PriceBox usd={i.precio_venta} showAll /></td>
                     <td className="p-3 text-right"><button onClick={() => setActiveLabel(i)} className="p-1.5 bg-teal-50 text-teal-700 rounded-lg"><Printer className="w-3.5 h-3.5" /></button></td>
@@ -166,7 +166,7 @@ export default function Inventario() {
       {tab === 'alertas' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {alertas.map(i => (
-            <div key={i.id} className="card-box border-rose-200 bg-rose-50/20"><h4 className="font-bold text-sm">{i.nombre}</h4><p className="text-xs text-rose-600 font-bold mt-1">Stock: {i.stock} / Mín: {i.stock_minimo}</p></div>
+            <div key={i.id} className="card-box border-rose-200 bg-rose-50/20"><h4 className="font-bold text-sm">{i.nombre}</h4><p className="text-xs text-rose-600 font-bold mt-1">Stock: {i.stock_actual} / Mín: {i.stock_minimo}</p></div>
           ))}
         </div>
       )}
@@ -207,7 +207,7 @@ export default function Inventario() {
         <form onSubmit={registrarEntrada} className="card-box space-y-3 max-w-xl">
           <h3 className="font-bold text-sm">Entrada de Mercancía</h3>
           <select required className="input-field" value={entradaForm.producto_id} onChange={e => setEntradaForm({...entradaForm, producto_id: e.target.value})}>
-            <option value="">Seleccionar...</option>{list.map(p => <option key={p.id} value={p.id}>{p.nombre} (Stock: {p.stock})</option>)}
+            <option value="">Seleccionar...</option>{list.map(p => <option key={p.id} value={p.id}>{p.nombre} (Stock: {p.stock_actual})</option>)}
           </select>
           <div className="grid grid-cols-2 gap-3">
             <input required type="number" min="1" className="input-field" placeholder="Cantidad" value={entradaForm.cantidad} onChange={e => setEntradaForm({...entradaForm, cantidad: e.target.value})} />
