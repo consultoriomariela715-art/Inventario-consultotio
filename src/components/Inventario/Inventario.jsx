@@ -4,9 +4,10 @@ import { useCurrency } from '../../context/CurrencyContext'
 import { fmt } from '../../utils/helpers'
 import PriceBox from '../UI/PriceBox'
 import QRScanner from '../UI/QRScanner'
+import EtiquetasModal from './EtiquetasModal'
 import {
   Plus, AlertTriangle, QrCode, Printer, Search, RefreshCw,
-  X, Save, Package, Calendar, Edit3, Trash2, ArrowDownLeft, CheckCircle2
+  X, Save, Package, Calendar, Edit3, Trash2, ArrowDownLeft, Tag
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -15,10 +16,10 @@ export default function Inventario() {
   const [list, setList] = useState([])
   const [cats, setCats] = useState([])
   const [movs, setMovs] = useState([])
-  const [tab, setTab] = useState('stock') // stock | alertas | vencimientos | kardex | entrada
+  const [tab, setTab] = useState('stock')
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
-  const [activeLabel, setActiveLabel] = useState(null)
+  const [etiquetasModal, setEtiquetasModal] = useState(null)
   const [scanning, setScanning] = useState(false)
   const [q, setQ] = useState('')
   const [saving, setSaving] = useState(false)
@@ -33,7 +34,6 @@ export default function Inventario() {
 
   const load = async () => {
     try {
-      // 1. Cargar productos con fallback seguro
       const [pRes, cRes, mRes] = await Promise.all([
         supabase.from('productos').select('*').eq('activo', true).order('nombre'),
         supabase.from('categorias').select('*').order('nombre'),
@@ -45,7 +45,6 @@ export default function Inventario() {
         cRes.data.forEach(c => { categoriasMap[c.id] = c })
       }
 
-      // Mapear productos con sus categorías y normalizar stock y códigos
       const mappedProds = (pRes.data || []).map(p => ({
         ...p,
         codigo: p.codigo || p.sku || 'SIN-COD',
@@ -84,7 +83,6 @@ export default function Inventario() {
     const precioVentaNum = parseFloat(form.precio_venta) || 0
     const stockMinNum = parseInt(form.stock_minimo) || 5
 
-    // Payload sanitizado compatible con todas las columnas de Supabase
     const payload = {
       nombre: form.nombre.trim(),
       codigo: codeGenerated,
@@ -111,7 +109,6 @@ export default function Inventario() {
         const { data: np, error } = await supabase.from('productos').insert([payload]).select().single()
         if (error) throw error
 
-        // Registrar movimiento de stock inicial si stock > 0
         if (stockNum > 0 && np) {
           await supabase.from('movimientos').insert({
             producto_id: np.id,
@@ -122,7 +119,7 @@ export default function Inventario() {
             referencia: 'Stock Inicial'
           }).catch(() => {})
         }
-        toast.success(`Insumo "${form.nombre}" registrado en inventario`)
+        toast.success(`Insumo "${form.nombre}" registrado`)
       }
 
       setShowForm(false)
@@ -134,8 +131,7 @@ export default function Inventario() {
       })
       load()
     } catch (err) {
-      console.error('Error al guardar insumo:', err)
-      toast.error('Error al guardar en Supabase: ' + (err.message || 'Verifica los campos'))
+      toast.error('Error al guardar: ' + err.message)
     } finally {
       setSaving(false)
     }
@@ -162,7 +158,7 @@ export default function Inventario() {
   }
 
   const deleteProduct = async (id, nombre) => {
-    if (!confirm(`¿Estás seguro de desactivar el insumo "${nombre}" del almacén?`)) return
+    if (!confirm(`¿Desactivar el insumo "${nombre}" del almacén?`)) return
     try {
       const { error } = await supabase.from('productos').update({ activo: false }).eq('id', id)
       if (error) throw error
@@ -209,7 +205,6 @@ export default function Inventario() {
     }
   }
 
-  // Detección de vencimientos próximos (30 días)
   const hoy = new Date()
   const en30 = new Date(hoy.getTime() + 30 * 24 * 60 * 60 * 1000)
   const vencimientos = list.filter(i => {
@@ -229,11 +224,11 @@ export default function Inventario() {
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800 dark:text-white">Almacén & Kardex de Insumos</h1>
-          <p className="text-xs text-slate-400">Control de stock real, vencimientos, compras y trazabilidad de materiales</p>
+          <p className="text-xs text-slate-400">Control de stock real, etiquetas adhesivas, compras y trazabilidad</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setScanning(true)} className="btn-secondary">
-            <QrCode className="w-4 h-4 text-teal-600" /> Escanear QR
+            <QrCode className="w-4 h-4 text-teal-600" /> Escanear / Lector Láser
           </button>
           <button onClick={() => { setShowForm(!showForm); setEditId(null); setTab('stock') }} className={showForm ? 'btn-secondary' : 'btn-primary'}>
             {showForm ? <><X className="w-4 h-4" /> Cerrar</> : <><Plus className="w-4 h-4" /> Nuevo Insumo</>}
@@ -241,7 +236,7 @@ export default function Inventario() {
         </div>
       </div>
 
-      {/* Alerta de Vencimientos Próximos */}
+      {/* Alerta de Vencimientos */}
       {vencimientos.length > 0 && (
         <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl text-xs text-amber-800 dark:text-amber-300 font-semibold flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -252,7 +247,7 @@ export default function Inventario() {
         </div>
       )}
 
-      {/* Pestañas de Navegación del Inventario */}
+      {/* Pestañas */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 overflow-x-auto">
         {[
           { id: 'stock', label: 'Stock General', count: list.length },
@@ -282,7 +277,7 @@ export default function Inventario() {
         ))}
       </div>
 
-      {/* Formulario de Registro / Edición de Insumo */}
+      {/* Formulario */}
       {showForm && (
         <form onSubmit={saveProduct} className="card-box space-y-4 border-2 border-teal-200 bg-teal-50/20">
           <h3 className="font-bold text-sm text-teal-800 dark:text-teal-400 flex items-center gap-1.5">
@@ -308,7 +303,7 @@ export default function Inventario() {
                   onChange={e => setForm({...form, codigo: e.target.value.toUpperCase()})}
                   placeholder="OD-INS-1001"
                 />
-                <button type="button" onClick={generateCode} className="btn-secondary text-xs px-2.5" title="Generar código aleatorio">
+                <button type="button" onClick={generateCode} className="btn-secondary text-xs px-2.5" title="Generar código">
                   <RefreshCw className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -332,7 +327,7 @@ export default function Inventario() {
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-slate-500 block mb-1">Precio de Compra ($)</label>
+              <label className="text-[11px] font-semibold text-slate-500 block mb-1">Precio Compra ($)</label>
               <input type="number" step="0.01" min="0" className="input-field" value={form.precio_compra} onChange={e => setForm({...form, precio_compra: e.target.value})} />
             </div>
 
@@ -344,7 +339,7 @@ export default function Inventario() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="text-[11px] font-semibold text-slate-500 block mb-1">Ubicación / Estante</label>
+              <label className="text-[11px] font-semibold text-slate-500 block mb-1">Ubicación / Gaveta</label>
               <input className="input-field" value={form.ubicacion} onChange={e => setForm({...form, ubicacion: e.target.value})} placeholder="Ej: Gaveta 2, Estante A" />
             </div>
             <div>
@@ -359,14 +354,14 @@ export default function Inventario() {
 
           <div className="flex gap-2 pt-2">
             <button type="submit" disabled={saving} className="btn-primary">
-              <Save className="w-4 h-4" /> {saving ? 'Guardando en Almacén...' : editId ? 'Actualizar Insumo' : 'Guardar en Almacén'}
+              <Save className="w-4 h-4" /> {saving ? 'Guardando...' : editId ? 'Actualizar Insumo' : 'Guardar en Almacén'}
             </button>
             <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Cancelar</button>
           </div>
         </form>
       )}
 
-      {/* PESTAÑA 1: STOCK GENERAL */}
+      {/* TAB 1: STOCK GENERAL */}
       {tab === 'stock' && (
         <div className="space-y-3">
           <div className="relative">
@@ -416,13 +411,28 @@ export default function Inventario() {
                       </td>
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => setActiveLabel(i)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 rounded-lg" title="Imprimir Etiqueta QR">
-                            <QrCode className="w-3.5 h-3.5" />
+                          <button
+                            type="button"
+                            onClick={() => setEtiquetasModal(i)}
+                            className="btn-primary text-xs py-1 px-2 flex items-center gap-1 font-bold shadow-sm"
+                            title="Generar e Imprimir Etiquetas Adhesivas / Stickers"
+                          >
+                            <Tag className="w-3.5 h-3.5" /> Etiqueta QR
                           </button>
-                          <button onClick={() => startEdit(i)} className="p-1.5 hover:bg-yellow-50 text-yellow-600 rounded-lg" title="Editar Insumo">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(i)}
+                            className="p-1.5 hover:bg-yellow-50 text-yellow-600 rounded-lg"
+                            title="Editar Insumo"
+                          >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => deleteProduct(i.id, i.nombre)} className="p-1.5 hover:bg-rose-50 text-rose-500 rounded-lg" title="Desactivar Insumo">
+                          <button
+                            type="button"
+                            onClick={() => deleteProduct(i.id, i.nombre)}
+                            className="p-1.5 hover:bg-rose-50 text-rose-500 rounded-lg"
+                            title="Desactivar Insumo"
+                          >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -433,7 +443,7 @@ export default function Inventario() {
                 {filtered.length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-center py-10 text-slate-400 text-xs">
-                      No hay insumos que coincidan con la búsqueda. Haz clic en <strong>"+ Nuevo Insumo"</strong> para registrar uno.
+                      No hay insumos registrados. Haz clic en <strong>"+ Nuevo Insumo"</strong> para agregar uno.
                     </td>
                   </tr>
                 )}
@@ -443,7 +453,7 @@ export default function Inventario() {
         </div>
       )}
 
-      {/* PESTAÑA 2: ALERTAS DE STOCK BAJO */}
+      {/* TAB 2: ALERTAS */}
       {tab === 'alertas' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {alertas.map(i => (
@@ -466,7 +476,7 @@ export default function Inventario() {
         </div>
       )}
 
-      {/* PESTAÑA 3: VENCIMIENTOS */}
+      {/* TAB 3: VENCIMIENTOS */}
       {tab === 'vencimientos' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {vencimientos.map(i => (
@@ -485,7 +495,7 @@ export default function Inventario() {
         </div>
       )}
 
-      {/* PESTAÑA 4: KARDEX */}
+      {/* TAB 4: KARDEX */}
       {tab === 'kardex' && (
         <div className="card-box p-0 overflow-hidden border dark:border-slate-800">
           <table className="w-full text-left text-xs">
@@ -524,7 +534,7 @@ export default function Inventario() {
         </div>
       )}
 
-      {/* PESTAÑA 5: ENTRADA DE MERCANCÍA */}
+      {/* TAB 5: ENTRADA DE MERCANCÍA */}
       {tab === 'entrada' && (
         <form onSubmit={registrarEntrada} className="card-box space-y-4 max-w-xl">
           <h3 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-1.5">
@@ -564,30 +574,20 @@ export default function Inventario() {
         </form>
       )}
 
-      {/* Modal Etiqueta QR */}
-      {activeLabel && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl border">
-            <div className="flex justify-between items-center border-b pb-2">
-              <span className="font-bold text-xs text-slate-500">ETIQUETA QR</span>
-              <button onClick={() => setActiveLabel(null)}><X className="w-4 h-4 text-slate-400" /></button>
-            </div>
-            <div>
-              <p className="font-bold text-sm text-slate-800 dark:text-white">{activeLabel.nombre}</p>
-              <p className="font-mono text-xs text-teal-600 font-bold mt-0.5">{activeLabel.codigo}</p>
-            </div>
-            <div className="bg-white p-3 rounded-2xl border inline-block shadow-inner">
-              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(activeLabel.codigo)}`} alt="QR" className="w-32 h-32 mx-auto" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setActiveLabel(null)} className="btn-secondary flex-1 justify-center text-xs">Cerrar</button>
-              <button onClick={() => window.print()} className="btn-primary flex-1 justify-center text-xs"><Printer className="w-3.5 h-3.5" /> Imprimir</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal Generador de Etiquetas Adhesivas */}
+      <EtiquetasModal
+        isOpen={!!etiquetasModal}
+        onClose={() => setEtiquetasModal(null)}
+        insumo={etiquetasModal}
+      />
 
-      {scanning && <QRScanner onScan={c => { setScanning(false); setQ(c); setTab('stock') }} onClose={() => setScanning(false)} />}
+      {/* Escáner QR */}
+      {scanning && (
+        <QRScanner
+          onScan={(c) => { setScanning(false); setQ(c); setTab('stock') }}
+          onClose={() => setScanning(false)}
+        />
+      )}
     </div>
   )
 }
