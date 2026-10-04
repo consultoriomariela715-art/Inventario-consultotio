@@ -100,6 +100,7 @@ export default function Shell() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
+        <span className="bg-rose-600 text-white font-black px-2.5 py-1 rounded-lg text-xs shadow-lg animate-pulse">ACTUALIZADO: 1:35:54 p. m.</span>
         <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-2.5 flex items-center justify-between flex-wrap gap-3 sticky top-0 z-30 shadow-sm">
           
           <div className="flex items-center gap-3">
