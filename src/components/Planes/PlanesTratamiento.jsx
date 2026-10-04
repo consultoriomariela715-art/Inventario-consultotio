@@ -29,25 +29,72 @@ export default function PlanesTratamiento() {
   })
 
   const load = async () => {
-    const [ptRes, pRes, dRes, caRes, clRes] = await Promise.all([
-      supabase.from('planes_tratamiento').select('*, pacientes(nombres, apellidos, cedula, telefono, direccion), doctores(nombres, apellidos)').order('created_at', { ascending: false }),
-      supabase.from('pacientes').select('id, nombres, apellidos, cedula, telefono, direccion').eq('activo', true).order('nombres'),
-      supabase.from('doctores').select('id, nombres, apellidos, especialidad').eq('activo', true),
-      supabase.from('cuotas_abonos').select('*').order('created_at', { ascending: true }),
-      supabase.from('configuracion_consultorio').select('*').limit(1)
-    ])
+    try {
+      // INTENTO 1: Unión nativa de Supabase
+      const { data: ptData, error: ptError } = await supabase
+        .from('planes_tratamiento')
+        .select('*, pacientes(nombres, apellidos, cedula, telefono, direccion), doctores(nombres, apellidos)')
+        .order('created_at', { ascending: false })
 
-    setPlanes(ptRes.data || [])
-    setPacs(pRes.data || [])
-    setDocs(dRes.data || [])
-    if (clRes.data?.[0]) setClinica(clRes.data[0])
+      if (ptError) {
+        console.warn("La unión de planes falló, cargando de forma manual con fallback:", ptError.message)
+        
+        // INTENTO 2: Mapeo manual ultra-robusto
+        const [ptRes, pRes, dRes, caRes, clRes] = await Promise.all([
+          supabase.from('planes_tratamiento').select('*').order('created_at', { ascending: false }),
+          supabase.from('pacientes').select('id, nombres, apellidos, cedula, telefono, direccion').eq('activo', true),
+          supabase.from('doctores').select('id, nombres, apellidos, especialidad').eq('activo', true),
+          supabase.from('cuotas_abonos').select('*').order('created_at', { ascending: true }),
+          supabase.from('configuracion_consultorio').select('*').limit(1)
+        ])
 
-    const map = {}
-    ;(caRes.data || []).forEach(a => {
-      if (!map[a.plan_id]) map[a.plan_id] = []
-      map[a.plan_id].push(a)
-    })
-    setAbonosPorPlan(map)
+        const pacsMap = {}
+        const docsMap = {}
+        if (pRes.data) pRes.data.forEach(p => { pacsMap[p.id] = p })
+        if (dRes.data) dRes.data.forEach(d => { docsMap[d.id] = d })
+
+        const mappedPlanes = (ptRes.data || []).map(p => ({
+          ...p,
+          pacientes: pacsMap[p.paciente_id] || null,
+          doctores: docsMap[p.doctor_id] || null
+        }))
+
+        setPlanes(mappedPlanes)
+        setPacs(pRes.data || [])
+        setDocs(dRes.data || [])
+        if (clRes.data?.[0]) setClinica(clRes.data[0])
+
+        const map = {}
+        ;(caRes.data || []).forEach(a => {
+          if (!map[a.plan_id]) map[a.plan_id] = []
+          map[a.plan_id].push(a)
+        })
+        setAbonosPorPlan(map)
+
+      } else {
+        // Carga normal exitosa
+        const [pRes, dRes, caRes, clRes] = await Promise.all([
+          supabase.from('pacientes').select('id, nombres, apellidos, cedula, telefono, direccion').eq('activo', true).order('nombres'),
+          supabase.from('doctores').select('id, nombres, apellidos, especialidad').eq('activo', true),
+          supabase.from('cuotas_abonos').select('*').order('created_at', { ascending: true }),
+          supabase.from('configuracion_consultorio').select('*').limit(1)
+        ])
+
+        setPlanes(ptData || [])
+        setPacs(pRes.data || [])
+        setDocs(dRes.data || [])
+        if (clRes.data?.[0]) setClinica(clRes.data[0])
+
+        const map = {}
+        ;(caRes.data || []).forEach(a => {
+          if (!map[a.plan_id]) map[a.plan_id] = []
+          map[a.plan_id].push(a)
+        })
+        setAbonosPorPlan(map)
+      }
+    } catch (e) {
+      console.error("Error cargando planes de tratamiento:", e)
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -134,7 +181,6 @@ export default function PlanesTratamiento() {
 
     toast.success(`Abono ${rec} registrado`)
     
-    // ABRIR FACTURA SENIAT / EXCEL PARA EL ABONO
     setReciboModalData({
       factura: rec,
       paciente_nombre: plan.pacientes ? `${plan.pacientes.nombres} ${plan.pacientes.apellidos}` : 'Paciente',
@@ -167,8 +213,13 @@ export default function PlanesTratamiento() {
     })
   }
 
+  const cuotaMensualSugerida = (p) => {
+    const restantes = Math.max(1, p.cuotas_total - p.cuotas_pagadas)
+    return p.saldo_pendiente_usd / restantes
+  }
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 animate-fade-up">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800 dark:text-white">Planes de Tratamiento & Cuotas</h1>
@@ -243,7 +294,7 @@ export default function PlanesTratamiento() {
           const pct = p.monto_total_usd > 0 ? (((p.monto_total_usd - p.saldo_pendiente_usd) / p.monto_total_usd) * 100) : 100
 
           return (
-            <div key={p.id} className="card-box p-0 overflow-hidden border">
+            <div key={p.id} className="card-box p-0 overflow-hidden border dark:border-slate-800">
               <div className="p-4 flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <div className="flex items-center gap-2">
@@ -252,7 +303,7 @@ export default function PlanesTratamiento() {
                       {p.estado === 'completado' ? '✓ Liquidado' : '⏳ En Curso'}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">Paciente: <b>{p.pacientes?.nombres} {p.pacientes?.apellidos}</b></p>
+                  <p className="text-xs text-slate-500 mt-0.5">Paciente: <b>{p.pacientes?.nombres || 'Paciente'} {p.pacientes?.apellidos || ''}</b></p>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
@@ -300,8 +351,8 @@ export default function PlanesTratamiento() {
                         <input
                           placeholder="Notas de la cuota"
                           className="input-field flex-1 text-xs"
-                          value={abonoForm.plan_id === p.id ? abonoForm.notas : ''}
-                          onChange={e => setAbonoForm({ ...abonoForm, plan_id: p.id, notas: e.target.value })}
+                          value={abonoForm.plan_id === p.id ? abonoForm.notes : ''}
+                          onChange={e => setAbonoForm({ ...abonoForm, plan_id: p.id, notes: e.target.value })}
                         />
                         <button type="button" onClick={() => registrarAbono(p)} className="btn-primary text-xs shrink-0 py-1.5">
                           <Save className="w-3.5 h-3.5" /> Cobrar Cuota
@@ -316,7 +367,7 @@ export default function PlanesTratamiento() {
                       <div key={a.id} className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs flex justify-between items-center">
                         <div>
                           <span className="font-bold font-mono mr-2 text-teal-700 dark:text-teal-400">{a.recibo}</span>
-                          <span className="text-slate-500">{a.notas || `Cuota #${a.numero_cuota}`} • {new Date(a.created_at).toLocaleDateString('es-VE')}</span>
+                          <span className="text-slate-500">{a.notes || `Cuota #${a.numero_cuota}`} • {new Date(a.created_at).toLocaleDateString('es-VE')}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-bold">{fmt(a.monto_usd, 'USD')}</span>

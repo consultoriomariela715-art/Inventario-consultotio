@@ -6,6 +6,10 @@ import { fmt } from '../../utils/helpers'
 import PriceBox from '../UI/PriceBox'
 import Odontograma from './Odontograma'
 import ReciboModal from '../ReciboModal'
+import RecipeModal from './RecipeModal'
+import VoiceDictation from '../UI/VoiceDictation'
+import CalculadoraCambioModal from '../UI/CalculadoraCambioModal'
+import AsistenteClinicoModal from './AsistenteClinicoModal'
 import {
   Plus, Search, Save, X, Printer, Receipt, Edit3, Trash2, Sparkles, DollarSign
 } from 'lucide-react'
@@ -22,6 +26,9 @@ export default function Historial() {
   const [dientesSel, setDientesSel] = useState([])
   const [reciboModalData, setReciboModalData] = useState(null)
   const [editId, setEditId] = useState(null)
+  const [calculadoraOpen, setCalculadoraOpen] = useState(false)
+  const [asistenteOpen, setAsistenteOpen] = useState(false)
+  const [recipeActivo, setRecipeActivo] = useState(null)
 
   const [form, setForm] = useState({
     paciente_id: '',
@@ -35,16 +42,55 @@ export default function Historial() {
   })
 
   const load = async () => {
-    const [h, p, t, cl] = await Promise.all([
-      supabase.from('historial_clinico').select('*, pacientes(nombres, apellidos, cedula, telefono, direccion)').order('created_at', { ascending: false }),
-      supabase.from('pacientes').select('id, nombres, apellidos, cedula, telefono, direccion').eq('activo', true).order('nombres'),
-      supabase.from('tratamientos').select('id, nombre, precio').eq('activo', true),
-      supabase.from('configuracion_consultorio').select('*').limit(1)
-    ])
-    setList(h.data || [])
-    setPacs(p.data || [])
-    setTrats(t.data || [])
-    if (cl.data?.[0]) setClinica(cl.data[0])
+    try {
+      // INTENTO 1: Consulta de unión estándar de Supabase
+      const { data: hData, error: hError } = await supabase
+        .from('historial_clinico')
+        .select('*, pacientes(nombres, apellidos, cedula, telefono, direccion)')
+        .order('created_at', { ascending: false })
+
+      if (hError) {
+        console.warn("La consulta de unión falló, aplicando mapeo manual de respaldo:", hError.message)
+        
+        // INTENTO 2: Descargar por separado y unir en memoria (Bypassea cualquier error de RLS o FKey)
+        const [hRes, pRes, tRes, clRes] = await Promise.all([
+          supabase.from('historial_clinico').select('*').order('created_at', { ascending: false }),
+          supabase.from('pacientes').select('id, nombres, apellidos, cedula, telefono, direccion').eq('activo', true),
+          supabase.from('tratamientos').select('id, nombre, precio').eq('activo', true),
+          supabase.from('configuracion_consultorio').select('*').limit(1)
+        ])
+
+        const pacientesMap = {}
+        if (pRes.data) {
+          pRes.data.forEach(p => { pacientesMap[p.id] = p })
+        }
+
+        const mappedHistorial = (hRes.data || []).map(h => ({
+          ...h,
+          pacientes: pacientesMap[h.paciente_id] || null
+        }))
+
+        setList(mappedHistorial)
+        setPacs(pRes.data || [])
+        setTrats(tRes.data || [])
+        if (clRes.data?.[0]) setClinica(clRes.data[0])
+      } else {
+        // Si la unión funcionó, cargar el resto normalmente
+        const [pRes, tRes, clRes] = await Promise.all([
+          supabase.from('pacientes').select('id, nombres, apellidos, cedula, telefono, direccion').eq('activo', true).order('nombres'),
+          supabase.from('tratamientos').select('id, nombre, precio').eq('activo', true),
+          supabase.from('configuracion_consultorio').select('*').limit(1)
+        ])
+
+        setList(hData || [])
+        setPacs(pRes.data || [])
+        setTrats(tRes.data || [])
+        if (clRes.data?.[0]) setClinica(clRes.data[0])
+      }
+    } catch (err) {
+      console.error("Error crítico en la carga del historial:", err)
+      toast.error("Error al conectar con la base de datos")
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -150,7 +196,7 @@ export default function Historial() {
   }
 
   const filtered = list.filter(h =>
-    `${h.pacientes?.nombres} ${h.pacientes?.apellidos} ${h.procedimiento} ${h.diagnostico} ${h.factura}`.toLowerCase().includes(q.toLowerCase())
+    `${h.pacientes?.nombres || ''} ${h.pacientes?.apellidos || ''} ${h.procedimiento || ''} ${h.diagnostico || ''} ${h.factura || ''}`.toLowerCase().includes(q.toLowerCase())
   )
 
   const abrirReciboDeFila = (h) => {
@@ -165,7 +211,7 @@ export default function Historial() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-up">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800 dark:text-white">Historial Clínico & Cobros</h1>
@@ -239,15 +285,27 @@ export default function Historial() {
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-slate-500 block mb-1">Diagnóstico & Observaciones Clínicas</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-[11px] font-semibold text-slate-500 block">Diagnóstico & Observaciones Clínicas</label>
+              <VoiceDictation onTranscript={(text) => setForm(prev => ({ ...prev, diagnostico: prev.diagnostico ? prev.diagnostico + ' ' + text : text }))} />
+            </div>
             <textarea className="input-field" value={form.diagnostico} onChange={e => setForm({...form, diagnostico: e.target.value})} placeholder="Detalles clínicos de la intervención..." rows={2} />
           </div>
 
           <div className="p-3.5 bg-slate-900 text-white rounded-xl text-xs space-y-1">
             <div className="flex justify-between text-slate-400"><span>Subtotal:</span><span>${subtotalUSD.toFixed(2)} USD</span></div>
             {taxPct > 0 && <div className="flex justify-between text-teal-400"><span>Impuesto ({taxPct}%):</span><span>${taxUSD.toFixed(2)} USD</span></div>}
-            <div className="flex justify-between text-sm font-bold border-t border-slate-700 pt-1.5">
-              <span>Total a Cobrar:</span><span className="text-teal-400">${totalUSD.toFixed(2)} USD</span>
+            <div className="flex justify-between items-center pt-1 border-t border-slate-700">
+              <button 
+                type="button" 
+                onClick={() => setCalculadoraOpen(true)} 
+                className="text-[11px] bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 border border-teal-500/30"
+              >
+                💵 Calcular Cambio / Vuelto
+              </button>
+              <div className="text-right">
+                <span className="text-sm font-bold text-teal-400">${totalUSD.toFixed(2)} USD</span>
+              </div>
             </div>
             <div className="flex justify-between text-slate-300"><span>Total en Bs. (BCV):</span><span>Bs. {(totalUSD * (rates?.VES || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span></div>
           </div>
@@ -270,7 +328,7 @@ export default function Historial() {
             <div className="flex justify-between items-start flex-wrap gap-2">
               <div>
                 <span className="text-[10px] font-mono font-bold text-teal-700 bg-teal-50 dark:bg-teal-950/40 dark:text-teal-300 px-2 py-0.5 rounded">{h.factura || 'FACTURA'}</span>
-                <h3 className="font-bold text-sm text-slate-800 dark:text-white mt-1">{h.pacientes?.nombres} {h.pacientes?.apellidos}</h3>
+                <h3 className="font-bold text-sm text-slate-800 dark:text-white mt-1">{h.pacientes?.nombres || 'Paciente'} {h.pacientes?.apellidos || ''}</h3>
                 <p className="text-xs font-bold text-teal-700 dark:text-teal-400">{h.procedimiento}</p>
                 <p className="text-[11px] text-slate-400">{new Date(h.fecha || h.created_at).toLocaleDateString('es-VE')}</p>
               </div>
@@ -283,6 +341,13 @@ export default function Historial() {
                     title="Emitir Factura SENIAT / Excel"
                   >
                     <Receipt className="w-3.5 h-3.5" /> Factura / Recibo
+                  </button>
+                  <button
+                    onClick={() => setRecipeActivo({ paciente: h.pacientes, doctor: { nombres: 'Tratante', apellidos: '' } })}
+                    className="btn-secondary text-xs py-1 px-2 inline-flex items-center gap-1 text-teal-700 hover:bg-teal-50"
+                    title="Emitir Récipe Médico"
+                  >
+                    💊 Récipe
                   </button>
                   <button
                     onClick={() => startEdit(h)}
@@ -317,6 +382,30 @@ export default function Historial() {
         onClose={() => setReciboModalData(null)}
         data={reciboModalData}
         consultorio={clinica}
+      />
+
+      <RecipeModal
+        isOpen={!!recipeActivo}
+        onClose={() => setRecipeActivo(null)}
+        paciente={recipeActivo?.paciente}
+        doctor={recipeActivo?.doctor}
+        consultorio={clinica}
+      />
+
+      <CalculadoraCambioModal
+        isOpen={calculadoraOpen}
+        onClose={() => setCalculadoraOpen(false)}
+        totalUSD={totalUSD}
+        tasaVES={rates?.VES || 1}
+        tasaCOP={rates?.COP || 1}
+      />
+
+      <AsistenteClinicoModal
+        isOpen={asistenteOpen}
+        onClose={() => setAsistenteOpen(false)}
+        onApply={(data) => setForm(prev => ({ ...prev, procedimiento: data.procedimiento, diagnostico: data.diagnostico }))}
+        pacienteTelefono={pacs.find(p => p.id === form.paciente_id)?.telefono}
+        pacienteNombre={pacs.find(p => p.id === form.paciente_id)?.nombres}
       />
     </div>
   )
